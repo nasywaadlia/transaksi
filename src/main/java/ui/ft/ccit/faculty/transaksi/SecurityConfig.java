@@ -3,6 +3,7 @@ package ui.ft.ccit.faculty.transaksi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -10,6 +11,7 @@ import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 @EnableWebSecurity
+@Profile("local") // Hanya aktif saat profile "local"
 public class SecurityConfig {
 
     @Bean
@@ -18,9 +20,14 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // ========== GET API publik ==========
                         .requestMatchers(HttpMethod.GET, "/api/**").permitAll()
-
+ // Swagger
+        .requestMatchers(
+            "/swagger-ui/**",
+            "/v3/api-docs/**",
+            "/swagger-ui.html"
+        ).permitAll()
                         // ========== Write API perlu token ==========
-                        .requestMatchers(HttpMethod.POST, "/api/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/**").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/api/**").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/**").authenticated()
 
