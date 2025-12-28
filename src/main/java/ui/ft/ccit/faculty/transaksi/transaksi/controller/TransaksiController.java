@@ -38,6 +38,13 @@ public ResponseEntity<?> create(@RequestBody TransaksiRequest request) {
             .status(HttpStatus.CREATED)
             .body(service.createTransaksi(request));
 }
+@PutMapping("/{id}")
+public ResponseEntity<?> update(
+        @PathVariable String id,
+        @RequestBody TransaksiRequest request
+) {
+    return ResponseEntity.ok(service.updateTransaksi(id, request));
+}
 
 
     // DELETE transaksi (nanti bisa rollback stok)

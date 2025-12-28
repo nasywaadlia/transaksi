@@ -132,4 +132,84 @@ public class TransaksiService {
         total
     );
     }
+    @Transactional
+public TransaksiResponse updateTransaksi(String kodeTransaksi, TransaksiRequest request) {
+
+    // 1️⃣ Ambil transaksi lama
+    Transaksi transaksi = transaksiRepo.findById(kodeTransaksi)
+            .orElseThrow(() -> new RuntimeException("Transaksi tidak ditemukan"));
+
+    // 2️⃣ Validasi pelanggan & karyawan
+    pelangganRepo.findById(request.getIdPelanggan())
+            .orElseThrow(() -> new RuntimeException("Pelanggan tidak ditemukan"));
+
+    karyawanRepo.findById(request.getIdKaryawan())
+            .orElseThrow(() -> new RuntimeException("Karyawan tidak ditemukan"));
+
+    // 3️⃣ Ambil detail lama → rollback stok
+    List<DetailTransaksi> oldDetails =
+            detailRepo.findByTransaksi_KodeTransaksi(kodeTransaksi);
+
+    for (DetailTransaksi d : oldDetails) {
+        Barang barang = d.getBarang();
+        barang.setStok((short) (barang.getStok() + d.getJumlah()));
+        barangRepo.save(barang);
+    }
+
+    // 4️⃣ Hapus detail lama
+    detailRepo.deleteAll(oldDetails);
+
+    // 6️⃣ Simpan detail baru + kurangi stok
+    for (TransaksiRequest.DetailRequest d : request.getDetails()) {
+
+        Barang barang = barangRepo.findById(d.getIdBarang())
+                .orElseThrow(() ->
+                        new RuntimeException("Barang " + d.getIdBarang() + " tidak ditemukan"));
+
+        if (barang.getStok() < d.getJumlah()) {
+            throw new RuntimeException(
+                    "Stok barang " + barang.getNama() + " tidak mencukupi");
+        }
+
+        barang.setStok((short) (barang.getStok() - d.getJumlah()));
+        barangRepo.save(barang);
+
+        DetailTransaksi detail = new DetailTransaksi();
+        detail.setId(new DetailTransaksiId(
+                transaksi.getKodeTransaksi(),
+                barang.getIdBarang()
+        ));
+        detail.setTransaksi(transaksi);
+        detail.setBarang(barang);
+        detail.setJumlah(d.getJumlah());
+
+        detailRepo.save(detail);
+    }
+
+    // 7️⃣ Build response
+    List<DetailTransaksi> savedDetails =
+            detailRepo.findByTransaksi_KodeTransaksi(transaksi.getKodeTransaksi());
+
+    List<TransaksiResponse.DetailResponse> detailResponses =
+            savedDetails.stream()
+                    .map(d -> new TransaksiResponse.DetailResponse(
+                            d.getBarang().getIdBarang(),
+                            d.getJumlah(),
+                            d.getSubtotal()
+                    ))
+                    .toList();
+
+    Double total = detailResponses.stream()
+            .mapToDouble(TransaksiResponse.DetailResponse::getSubtotal)
+            .sum();
+
+   return new TransaksiResponse(
+    transaksi.getKodeTransaksi(),
+    LocalDateTime.now(),          // atau transaksi.getCreatedAt kalau ada
+    request.getIdPelanggan(),
+    request.getIdKaryawan(),
+    detailResponses,
+    total
+);
+}
 }
